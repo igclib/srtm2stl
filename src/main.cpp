@@ -1,13 +1,26 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <vector>
 
+namespace srtm {
+// constants
 const int SRTM_SIZE = 1201;
 const size_t TILENAME_SIZE = sizeof("N00E000.hgt");
 
+// typedefs
 using heightmap_t = short[SRTM_SIZE][SRTM_SIZE];
 using tilename_t = char[TILENAME_SIZE];
-using tilepixel_t = std::pair<short, short>;
+using vec3_t = short[3];
+using triangle_t = vec3_t[4]; // 3 vertices + 1 normal
+using trianglelist_t = std::vector<triangle_t>;
+using interpolation_t = enum {
+  SWNE_DIAGONAL,
+  NWSE_DIAGONAL,
+  ALTERNATING_DIAGONALS,
+  SHORTEST_DIAGONAL,
+  DELAUNAY
+};
 
 void get_tile_name(double lat, double lon, tilename_t &tile_name) {
   char latchar = lat > 0.0 ? 'N' : 'S';
@@ -19,13 +32,12 @@ void get_tile_name(double lat, double lon, tilename_t &tile_name) {
            lonchar, (int)intlon);
 }
 
-tilepixel_t get_tile_pixel(double lat, double lon) {
+void get_tile_pixel(double lat, double lon, short &xtile, short &ytile) {
   double intlat, intlon;
   double latdec = modf(lat, &intlat);
   double londec = modf(lon, &intlon);
-  short x = std::round(SRTM_SIZE - 1 - SRTM_SIZE * latdec);
-  short y = std::round(SRTM_SIZE * londec);
-  return std::make_pair(x, y);
+  xtile = std::round(SRTM_SIZE - 1 - SRTM_SIZE * latdec);
+  ytile = std::round(SRTM_SIZE * londec);
 }
 
 void read_tile(const std::string &filename, heightmap_t &heightmap) {
@@ -43,24 +55,34 @@ void read_tile(const std::string &filename, heightmap_t &heightmap) {
             "Error reading file (" + std::to_string(file.tellg()) + ")";
         throw std::runtime_error(error);
       }
-      alt = (buffer[0] << 8) | buffer[1]; // big endian order
+      // swap bytes as they are stored in big endian
+      alt = (buffer[0] << 8) | buffer[1];
       heightmap[i][j] = alt;
     }
   }
 }
 
-int get_elevation(double lat, double lon, const std::string &prefix) {
-  tilename_t tile;
-  get_tile_name(lat, lon, tile);
-  tilepixel_t pixel = get_tile_pixel(lat, lon);
+short get_elevation(double lat, double lon, const std::string &prefix) {
+  tilename_t tilename;
+  get_tile_name(lat, lon, tilename);
+  short xtile, ytile;
+  get_tile_pixel(lat, lon, xtile, ytile);
+  std::string filename = prefix + tilename;
   heightmap_t heightmap;
-  std::string filename = prefix + tile;
   read_tile(filename, heightmap);
-  return heightmap[pixel.first][pixel.second];
+  return heightmap[xtile][ytile];
 }
 
+trianglelist_t triangulate(const heightmap_t &heightmap,
+                           interpolation_t interpolation) {
+  trianglelist_t triangles;
+  return triangles;
+}
+
+} // namespace srtm
+
 int main(int argc, const char *argv[]) {
-  std::cout << get_elevation(44.684413, 6.614422, "test/") << std::endl;
+  std::cout << srtm::get_elevation(44.684413, 6.614422, "test/") << std::endl;
 
   return EXIT_SUCCESS;
 }
