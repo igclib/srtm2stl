@@ -24,6 +24,22 @@ public:
     return normal;
   }
 
+  /**
+   * @brief returns the vertice at index pos
+   *
+   * @throw if pos is not in {0, 1, 2}
+   *
+   * @param pos
+   * @return const vec3&
+   */
+  inline const vec3 &at(int pos) const {
+    if (pos < 0 || pos > 2) {
+      throw std::out_of_range("pos " + std::to_string(pos) +
+                              " is out of range (max 2)");
+    }
+    return vert_[pos];
+  }
+
 private:
   vec3 vert_[3];
 };

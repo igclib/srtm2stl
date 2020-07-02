@@ -69,6 +69,12 @@ public:
     return *this;
   }
 
+  template <typename T> inline void array(T e[3]) const {
+    e[0] = e_[0];
+    e[1] = e_[1];
+    e[2] = e_[2];
+  };
+
   inline double x() const { return e_[0]; }
   inline double y() const { return e_[1]; }
   inline double z() const { return e_[2]; }
