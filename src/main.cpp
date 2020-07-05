@@ -3,30 +3,35 @@
 #include <iostream>
 #include <vector>
 
+#include <getopt.h>
+
 #include <hgt.h>
 #include <triangle.h>
 #include <vec3.h>
 
-namespace srtm {
-// constants
+const std::string PROGRAM_NAME = "srtm2stl";
+const std::string VERSION = "v0.1.0";
 
-short get_elevation(double lat, double lon, const std::string &prefix) {
-  std::string tilename = hgt::tilename(lat, lon);
-  std::string filename = prefix + tilename;
-  hgt heightmap(filename);
-  return heightmap.at(lat, lon);
-}
+void usage() { std::cerr << PROGRAM_NAME << " " << VERSION << std::endl; }
 
-void tile2stl(const std::string &tile, const std::string &stl) {}
+int main(int argc, char *argv[]) {
 
-} // namespace srtm
+  switch (getopt(argc, argv, "ho:")) {
 
-int main(int argc, const char *argv[]) {
+  case '?':
+  case 'h':
+  default:
+    usage();
+    return EXIT_SUCCESS;
 
-  std::cout << srtm::get_elevation(44.684413, 6.614422, "test/") << std::endl;
+  case -1:
+    break;
+  }
 
-  hgt tile("test/N44E006.hgt");
+  std::cout << hgt::elevation(44.684413, 6.614422, "test/") << std::endl;
 
-  tile.toASCII("test/tile.stl");
+  // hgt tile("test/N44E006.hgt");
+  // tile.toASCII("test/tilenosyncv2.stl");
+
   return EXIT_SUCCESS;
 }

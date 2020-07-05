@@ -2,9 +2,24 @@
 
 #include <cmath>
 
+/**
+ * @brief A basic 3D vector
+ *
+ */
 class vec3 {
 public:
+  /**
+   * @brief Construct a new vec3 with all coordinates at zero
+   *
+   */
   vec3() : e_{0, 0, 0} {};
+  /**
+   * @brief Construct a new vec3 with coordinates a, b and c
+   *
+   * @param a x-coordinate
+   * @param b y-coordinate
+   * @param c z-coordinate
+   */
   vec3(double a, double b, double c) : e_{a, b, c} {}
 
   /**
@@ -69,14 +84,28 @@ public:
     return *this;
   }
 
+  /**
+   * @brief populates the given array with the vector coordinates
+   */
   template <typename T> inline void array(T e[3]) const {
     e[0] = e_[0];
     e[1] = e_[1];
     e[2] = e_[2];
   };
 
+  /**
+   * @brief returns the x coordinate
+   */
   inline double x() const { return e_[0]; }
+
+  /**
+   * @brief returns the y coordinate
+   */
   inline double y() const { return e_[1]; }
+
+  /**
+   * @brief returns the z coordinate
+   */
   inline double z() const { return e_[2]; }
 
 private:
