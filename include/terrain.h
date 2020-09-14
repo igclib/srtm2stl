@@ -12,9 +12,9 @@
 #include <vec3.h>
 
 /**
- * @brief The hgt class encapsulates elevation models of SRTM files.
+ * @brief The terrain class encapsulates elevation models of SRTM files.
  */
-class hgt {
+class terrain {
 
   static const short TWO_BYTES = 2;
   static const int SRTM_1_ROWS = 3601;
@@ -26,7 +26,7 @@ class hgt {
   static const short SRTM_NO_DATA = -32768;
   static const int TILENAME_SIZE = sizeof("N00E000.hgt");
 
-  enum class interpolation {
+  enum class triangulation {
     SWNE_DIAGONAL,
     NWSE_DIAGONAL,
     // ALTERNATING_DIAGONALS,
@@ -35,7 +35,7 @@ class hgt {
     DEFAULT = SWNE_DIAGONAL,
   };
 
-  enum class fix_missing {
+  enum fix_missing {
     NONE,
     NEAREST,
     DEFAULT = NEAREST,
@@ -43,16 +43,16 @@ class hgt {
 
 public:
   /**
-   * @brief Construct a new hgt object from a complete tile
+   * @brief Construct a new terrain object from a complete tile
    *
    * @param filename path to a HGT tile
    * @param strategy what to do with missing data points
    */
-  hgt(const std::string &filename,
-      fix_missing strategy = fix_missing::DEFAULT) {
+  terrain(const std::string &filename,
+          fix_missing strategy = fix_missing::NONE) {
     std::ifstream file(filename, std::ios::in | std::ios::binary);
     if (!file) {
-      throw std::runtime_error("Could not open " + filename);
+      throw std::runtime_error("could not open " + filename);
     }
 
     /**
@@ -62,7 +62,7 @@ public:
     if (file_size == SRTM_1_FILE_SIZE) {
       throw std::runtime_error("SRTM-1 is not yet supported");
     } else if (file_size != SRTM_3_FILE_SIZE) {
-      throw std::runtime_error("File size " + std::to_string(file_size) +
+      throw std::runtime_error("file size " + std::to_string(file_size) +
                                " does not match SRTM-3 file size");
     }
 
@@ -70,7 +70,8 @@ public:
     short alt;
     for (int i = 0; i < SRTM_3_ROWS; ++i) {
       for (int j = 0; j < SRTM_3_COLUMNS; ++j) {
-        if (!file.read(reinterpret_cast<char *>(buffer), sizeof(buffer))) {
+        // must reinterpret_cast because read expects char *
+        if (!file.read(reinterpret_cast<char *>(buffer), TWO_BYTES)) {
           std::string error = "Error reading " + filename + " (byte " +
                               std::to_string(file.tellg()) + ")";
           throw std::runtime_error(error);
@@ -85,11 +86,11 @@ public:
     fix_missing_data(strategy);
 
     // store tile misc information
-    std::string basename = std::filesystem::path(filename).filename();
-    bool north = basename.substr(0, 1) == "N";
-    bool east = basename.substr(3, 1) == "E";
-    double lat = std::stod(basename.substr(1, 2));
-    double lon = std::stod(basename.substr(4, 3));
+    const std::string basename = std::filesystem::path(filename).filename();
+    const bool north = basename.substr(0, 1) == "N";
+    const bool east = basename.substr(3, 1) == "E";
+    const double lat = std::stod(basename.substr(1, 2));
+    const double lon = std::stod(basename.substr(4, 3));
 
     swlat_ = north ? lat : -lat;
     swlon_ = east ? lon : -lon;
@@ -97,7 +98,9 @@ public:
 
   void fix_missing_data(fix_missing strategy) {
     switch (strategy) {
-    case fix_missing::NEAREST: {
+    case NONE:
+      break;
+    case NEAREST: {
       std::vector<short> nearest;
       int delta;
       for (int i = 0; i < SRTM_3_ROWS; ++i) {
@@ -168,8 +171,8 @@ public:
    */
   inline void pixel(double lat, double lon, short &xtile, short &ytile) const {
     double intlat, intlon;
-    double latdec = modf(lat, &intlat);
-    double londec = modf(lon, &intlon);
+    double latdec = std::modf(lat, &intlat);
+    double londec = std::modf(lon, &intlon);
     if (intlat != swlat_ || intlon != swlon_) {
       throw std::runtime_error("not the right tile");
     }
@@ -197,7 +200,7 @@ public:
    * @return std::vector<triangle>
    */
   std::vector<triangle>
-  triangulate(interpolation strategy = interpolation::DEFAULT) const {
+  triangulate(triangulation strategy = triangulation::DEFAULT) const {
     std::vector<triangle> triangles;
     int stepsize = 90; // meters
     double ax, ay, az;
@@ -236,7 +239,7 @@ public:
         d = vec3(dx, dy, dz);
 
         switch (strategy) {
-        case interpolation::SWNE_DIAGONAL: {
+        case triangulation::SWNE_DIAGONAL: {
           /*
            *    A - B
            *    | / |
@@ -246,7 +249,7 @@ public:
           triangles.emplace_back(b, c, d);
           break;
         }
-        case interpolation::NWSE_DIAGONAL: {
+        case triangulation::NWSE_DIAGONAL: {
           /*
            *    A - B
            *    | \ |
@@ -359,10 +362,39 @@ public:
    * @return double AMSL altitude of the point
    */
   static double elevation(double lat, double lon, const std::string &prefix) {
-    std::string tilename = hgt::tilename(lat, lon);
-    std::string filename = prefix + tilename;
-    hgt heightmap(filename);
-    return heightmap.at(lat, lon);
+    // identify tile filename
+    char tilename[TILENAME_SIZE];
+    const char latchar = lat > 0.0 ? 'N' : 'S';
+    const char lonchar = lon > 0.0 ? 'E' : 'W';
+
+    double intlat;
+    double intlon;
+    const double latdec = std::modf(lat, &intlat);
+    const double londec = std::modf(lon, &intlon);
+    snprintf(tilename, TILENAME_SIZE, "%c%02d%c%03d.hgt", latchar,
+             static_cast<int>(intlat), lonchar, static_cast<int>(intlon));
+
+    // read tile at lat lon offset
+    const std::string filename = prefix + tilename;
+    std::ifstream file(filename, std::ios::in | std::ios::binary);
+    if (!file) {
+      throw std::runtime_error("could not open " + std::string(filename));
+    }
+
+    const int xtile = std::round(SRTM_3_ROWS - 1 - SRTM_3_ROWS * latdec);
+    const int ytile = std::round(SRTM_3_ROWS * londec);
+    const int offset = TWO_BYTES * (xtile * SRTM_3_ROWS + ytile);
+
+    file.seekg(offset);
+    unsigned char buffer[TWO_BYTES];
+    if (!file.read(reinterpret_cast<char *>(buffer), TWO_BYTES)) {
+      std::string error = "error reading " + std::string(filename) + " (byte " +
+                          std::to_string(file.tellg()) + ")";
+      throw std::runtime_error(error);
+    }
+
+    // bytes are stored in big endian
+    return (buffer[0] << 8) | buffer[1];
   }
 
   /**
@@ -370,8 +402,6 @@ public:
    *
    * @param latlon vector of lat lon pairs
    * @param prefix path to a directory containing HGT files
-   *
-   * @todo this is quite inefficient. maybe
    */
   static std::vector<double>
   elevations(std::vector<std::pair<double, double>> latlon,

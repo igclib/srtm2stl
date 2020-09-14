@@ -5,7 +5,7 @@
 
 #include <getopt.h>
 
-#include <hgt.h>
+#include <terrain.h>
 #include <triangle.h>
 #include <vec3.h>
 
@@ -15,9 +15,7 @@ const std::string VERSION = "v0.1.0";
 void usage() { std::cerr << PROGRAM_NAME << " " << VERSION << std::endl; }
 
 int main(int argc, char *argv[]) {
-
   switch (getopt(argc, argv, "ho:")) {
-
   case '?':
   case 'h':
   default:
@@ -28,10 +26,9 @@ int main(int argc, char *argv[]) {
     break;
   }
 
-  std::cout << hgt::elevation(44.684413, 6.614422, "test/") << std::endl;
-
-  // hgt tile("test/N44E006.hgt");
-  // tile.toASCII("test/tilenosyncv2.stl");
+  double lat = 44.6;
+  double lon = 6.2;
+  double fast_alt = terrain::elevation(lat, lon, "test/");
 
   return EXIT_SUCCESS;
 }
